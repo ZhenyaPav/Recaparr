@@ -1,0 +1,3 @@
+Create a detailed, chronological, spoiler-filled recap of the movie or television episode represented by the supplied subtitle transcript.
+
+Cover the important events, character motivations, relationships, reveals, ending, and continuity details a viewer would need before watching what comes next. Resolve pronouns and unclear subtitle fragments conservatively. Do not invent visual events that are not supported by the dialogue. Do not discuss the transcript, subtitle quality, advertisements, or the summarization process. Use clear prose and useful paragraphs rather than a scene-by-scene timestamp list.

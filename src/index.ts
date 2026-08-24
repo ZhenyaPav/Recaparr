@@ -27,7 +27,7 @@ const server = createServer(createApp(config, database, mapper, service, logger)
 queue.start();
 server.listen(config.port, '0.0.0.0', () => logger.info('Recaparr listening', {
   port: config.port,
-  version: '0.1.1',
+  version: '0.1.2',
   eagerGeneration: config.eagerGeneration,
   lazyGeneration: config.lazyGeneration,
   preferredSubtitleLanguage: config.preferredSubtitleLanguage,

@@ -16,9 +16,11 @@ FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
     HOME=/home/node \
+    PATH=/app/node_modules/.bin:$PATH \
     RECAPARR_DATABASE_PATH=/data/recaparr.sqlite \
     RECAPARR_MEDIA_ROOT=/media \
-    RECAPARR_PROMPT_FILE=/app/prompts/recap.md
+    RECAPARR_PROMPT_FILE=/app/prompts/recap.md \
+    RECAPARR_SUMMARIZE_BIN=/app/node_modules/.bin/summarize
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates ffmpeg tini \

@@ -12,6 +12,7 @@ export interface Config {
   summaryLanguage: string;
   jellyfinUrl: string;
   jellyfinApiKey: string;
+  jellyfinUserId?: string;
   databasePath: string;
   mediaRoot: string;
   arrPathPrefix: string;
@@ -62,6 +63,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     .map((part) => positiveInteger(part.trim(), 0, 'RECAPARR_RETRY_DELAYS_MINUTES'));
   const promptFile = env.RECAPARR_PROMPT_FILE ?? path.resolve(process.cwd(), 'prompts/recap.md');
 
+  const jellyfinUserId = env.JELLYFIN_USER_ID?.trim();
+  if (jellyfinUserId && !/^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/.test(jellyfinUserId)) {
+    throw new Error('JELLYFIN_USER_ID must be a Jellyfin GUID');
+  }
+
   return {
     port: positiveInteger(env.RECAPARR_PORT, 8080, 'RECAPARR_PORT'),
     apiToken: required(env, 'RECAPARR_API_TOKEN'),
@@ -74,6 +80,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     summaryLanguage: normalizeLanguage(env.RECAPARR_SUMMARY_LANGUAGE ?? 'en'),
     jellyfinUrl: (env.JELLYFIN_URL ?? 'http://jellyfin:8096').replace(/\/$/, ''),
     jellyfinApiKey: required(env, 'JELLYFIN_API_KEY'),
+    jellyfinUserId,
     databasePath: env.RECAPARR_DATABASE_PATH ?? '/data/recaparr.sqlite',
     mediaRoot: path.resolve(env.RECAPARR_MEDIA_ROOT ?? '/media'),
     arrPathPrefix: path.posix.resolve(env.RECAPARR_ARR_PATH_PREFIX ?? '/downloads'),

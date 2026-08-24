@@ -18,12 +18,20 @@ describe('configuration', () => {
   });
 
   it('parses switches and languages', () => {
-    const config = loadConfig({ ...required, RECAPARR_EAGER_GENERATION: 'off', RECAPARR_LAZY_GENERATION: '0', RECAPARR_SUMMARY_LANGUAGE: 'pt-br' });
+    const config = loadConfig({
+      ...required,
+      RECAPARR_EAGER_GENERATION: 'off',
+      RECAPARR_LAZY_GENERATION: '0',
+      RECAPARR_SUMMARY_LANGUAGE: 'pt-br',
+      JELLYFIN_USER_ID: '4b79fe40f1e46f1df5dff64720dbece9'
+    });
     expect(config.eagerGeneration).toBe(false);
     expect(config.lazyGeneration).toBe(false);
     expect(config.summaryLanguage).toBe('pt-BR');
+    expect(config.jellyfinUserId).toBe('4b79fe40f1e46f1df5dff64720dbece9');
   });
 
   it('rejects malformed language values', () => expect(() => normalizeLanguage('../en')).toThrow('Invalid language'));
+  it('rejects malformed Jellyfin user IDs', () => expect(() => loadConfig({ ...required, JELLYFIN_USER_ID: 'not-a-guid' })).toThrow('JELLYFIN_USER_ID'));
   it('requires secrets', () => expect(() => loadConfig({})).toThrow('RECAPARR_API_TOKEN is required'));
 });

@@ -42,12 +42,51 @@ describe('service integration boundaries', () => {
       }), { status: 200 });
       return new Response(JSON.stringify({ Id: 'series123', Name: 'Show', Type: 'Series', ProviderIds: { Tvdb: '99' } }), { status: 200 });
     });
-    const client = new JellyfinClient('http://jellyfin:8096', 'secret-key', new PathMapper('/media', '/downloads', '/data'), fakeFetch as typeof fetch);
+    const client = new JellyfinClient('http://jellyfin:8096', 'secret-key', new PathMapper('/media', '/downloads', '/data'), {
+      userId: 'user123',
+      fetchImpl: fakeFetch as typeof fetch
+    });
     await expect(client.resolve('episode123')).resolves.toMatchObject({
       kind: 'episode', path: '/media/tv/Show.S01E01.mkv', tvdbId: '101', seriesTvdbId: '99', seasonNumber: 1, episodeNumber: 1
     });
     expect(requests.every((request) => request.headers.get('X-Emby-Token') === 'secret-key')).toBe(true);
     expect(requests.every((request) => !request.url.includes('secret-key'))).toBe(true);
+    expect(requests.every((request) => new URL(request.url).searchParams.get('userId') === 'user123')).toBe(true);
+  });
+
+  it('automatically selects an enabled Jellyfin administrator once', async () => {
+    const requests: Request[] = [];
+    const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      if (request.url.endsWith('/Users')) return new Response(JSON.stringify([
+        { Id: 'disabled-user', Policy: { IsAdministrator: true, IsDisabled: true } },
+        { Id: 'regular-user', Policy: { IsAdministrator: false, IsDisabled: false } },
+        { Id: 'admin-user', Policy: { IsAdministrator: true, IsDisabled: false } }
+      ]));
+      return new Response(JSON.stringify({
+        Id: 'movie123', Name: 'Movie', Type: 'Movie', Path: '/data/movies/Movie.mkv'
+      }));
+    });
+    const client = new JellyfinClient('http://jellyfin:8096', 'secret-key', new PathMapper('/media', '/downloads', '/data'), {
+      fetchImpl: fakeFetch as typeof fetch
+    });
+
+    await client.resolve('movie123');
+    await client.resolve('movie123');
+
+    expect(requests.filter((request) => request.url.endsWith('/Users'))).toHaveLength(1);
+    expect(requests.filter((request) => request.url.includes('/Items/')).every((request) =>
+      new URL(request.url).searchParams.get('userId') === 'admin-user')).toBe(true);
+  });
+
+  it('includes Jellyfin response details in lookup errors', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(new Response('Readable Jellyfin error', { status: 400 }));
+    const client = new JellyfinClient('http://jellyfin:8096', 'secret-key', new PathMapper('/media', '/downloads', '/data'), {
+      userId: 'user123',
+      fetchImpl: fakeFetch as typeof fetch
+    });
+    await expect(client.resolve('movie123')).rejects.toThrow('HTTP 400: Readable Jellyfin error');
   });
 
   it('sends cleaned text, not a media path, to summarize', async () => {

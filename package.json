@@ -1,6 +1,6 @@
 {
   "name": "recaparr",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Subtitle-driven movie and TV episode recaps over MCP",
   "type": "module",
   "engines": {

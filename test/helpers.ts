@@ -13,6 +13,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     summaryLanguage: 'en',
     jellyfinUrl: 'http://jellyfin:8096',
     jellyfinApiKey: 'jellyfin-key',
+    jellyfinUserId: '11111111111111111111111111111111',
     databasePath: ':memory:',
     mediaRoot: '/media',
     arrPathPrefix: '/downloads',

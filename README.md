@@ -23,10 +23,15 @@ Copy `.env.example` to `.env` for local development. The following values are re
 | `RECAPARR_API_TOKEN` | Bearer token required by MCP and webhook routes |
 | `RECAPARR_LLM_API_KEY` | API key for the OpenAI-compatible endpoint |
 | `JELLYFIN_API_KEY` | Jellyfin API key used to resolve item IDs and paths |
+| `JELLYFIN_USER_ID` | Optional Jellyfin library user ID; recommended for deterministic library access |
 
 The default LLM endpoint is `https://openrouter.ai/api/v1`, and the default model is `deepseek/deepseek-v4-flash-latest`. `RECAPARR_PREFERRED_SUBTITLE_LANGUAGE` controls subtitle selection; `RECAPARR_SUMMARY_LANGUAGE` controls eager recap output and the MCP default. Both default to `en`.
 
+Jellyfin 10.11 item lookups require a user context. Set `JELLYFIN_USER_ID` to the ID of a user that can access the relevant libraries. If omitted, Recaparr selects the first enabled administrator, or the first enabled user when no administrator is available. The selection is cached for the lifetime of the process.
+
 Boolean settings `RECAPARR_EAGER_GENERATION` and `RECAPARR_LAZY_GENERATION` default to `true`. If lazy generation is disabled, both cache-miss generation and `force_regenerate` are rejected.
+
+`RECAPARR_LOG_LEVEL` defaults to `info`. Operational logs include MCP requests and results, webhook intake, Jellyfin resolution, cache decisions, subtitle selection, generation timing, and retry state. API keys, bearer tokens, and subtitle/recap contents are never logged.
 
 ## MCP
 

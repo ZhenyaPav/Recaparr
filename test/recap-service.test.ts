@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RecapDatabase } from '../src/database.js';
 import { RecapService, RecapServiceError } from '../src/recap-service.js';
 import { testConfig } from './helpers.js';
+import { Logger } from '../src/logger.js';
 
 let database: RecapDatabase | undefined;
 afterEach(() => database?.close());
@@ -11,7 +12,7 @@ function setup(lazyGeneration = true) {
   const config = testConfig({ lazyGeneration });
   const jellyfin = { resolve: vi.fn().mockResolvedValue({ kind: 'movie', jellyfinId: 'abcdef123456', path: '/media/a.mkv', title: 'A', tmdbId: '1' }) };
   const queue = { wake: vi.fn() };
-  const service = new RecapService(config, database, jellyfin as never, queue as never);
+  const service = new RecapService(config, database, jellyfin as never, queue as never, new Logger('error'));
   return { service, queue };
 }
 

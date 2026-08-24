@@ -14,15 +14,28 @@ const config = loadConfig();
 const logger = new Logger(config.logLevel);
 const database = new RecapDatabase(config.databasePath);
 const mapper = new PathMapper(config.mediaRoot, config.arrPathPrefix, config.jellyfinPathPrefix);
-const jellyfin = new JellyfinClient(config.jellyfinUrl, config.jellyfinApiKey, mapper);
+const jellyfin = new JellyfinClient(config.jellyfinUrl, config.jellyfinApiKey, mapper, {
+  userId: config.jellyfinUserId,
+  logger
+});
 const subtitles = new SubtitleExtractor(config.preferredSubtitleLanguage, config.ffprobeBin, config.ffmpegBin);
 const summarizer = new Summarizer(config);
 const queue = new GenerationQueue(config, database, mapper, subtitles, summarizer, logger);
-const service = new RecapService(config, database, jellyfin, queue);
+const service = new RecapService(config, database, jellyfin, queue, logger);
 const server = createServer(createApp(config, database, mapper, service, logger));
 
 queue.start();
-server.listen(config.port, '0.0.0.0', () => logger.info('Recaparr listening', { port: config.port }));
+server.listen(config.port, '0.0.0.0', () => logger.info('Recaparr listening', {
+  port: config.port,
+  version: '0.1.1',
+  eagerGeneration: config.eagerGeneration,
+  lazyGeneration: config.lazyGeneration,
+  preferredSubtitleLanguage: config.preferredSubtitleLanguage,
+  summaryLanguage: config.summaryLanguage,
+  jellyfinUserConfigured: Boolean(config.jellyfinUserId),
+  llmBaseUrl: config.llmBaseUrl,
+  llmModel: config.llmModel
+}));
 
 function shutdown(signal: string): void {
   logger.info('shutting down', { signal });

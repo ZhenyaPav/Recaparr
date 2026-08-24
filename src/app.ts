@@ -16,7 +16,8 @@ export function createApp(config: Config, database: RecapDatabase, mapper: PathM
   app.get('/healthz', (_request, response) => {
     try {
       database.ping();
-      response.json({ status: 'ok', version: '0.1.0' });
+      logger.debug('health check passed');
+      response.json({ status: 'ok', version: '0.1.1' });
     } catch {
       response.status(503).json({ status: 'unhealthy' });
     }
@@ -29,9 +30,23 @@ export function createApp(config: Config, database: RecapDatabase, mapper: PathM
   const webhook = (source: 'sonarr' | 'radarr') => (request: express.Request, response: express.Response) => {
     try {
       const parsed = source === 'sonarr' ? parseSonarrWebhook(request.body, mapper) : parseRadarrWebhook(request.body, mapper);
-      if (parsed.test) { response.json({ status: 'ok', test: true }); return; }
-      if (parsed.ignored) { response.json({ status: 'ignored' }); return; }
+      if (parsed.test) {
+        logger.info('webhook test received', { source });
+        response.json({ status: 'ok', test: true });
+        return;
+      }
+      if (parsed.ignored) {
+        logger.info('webhook event ignored', { source });
+        response.json({ status: 'ignored' });
+        return;
+      }
       const itemIds = parsed.items.map((identity) => service.ingest(identity).id);
+      logger.info('webhook import accepted', {
+        source,
+        items: itemIds.length,
+        itemIds,
+        eagerGeneration: config.eagerGeneration
+      });
       response.status(202).json({ status: config.eagerGeneration ? 'queued' : 'recorded', items: itemIds.length, itemIds });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bearerAuth } from '../src/auth.js';
 import { RecapDatabase } from '../src/database.js';
 import { JellyfinClient } from '../src/jellyfin.js';
-import { Logger } from '../src/logger.js';
 import { PathMapper } from '../src/path-mapper.js';
 import { GenerationQueue } from '../src/queue.js';
 import { Summarizer } from '../src/summarizer.js';
@@ -117,11 +116,15 @@ describe('service integration boundaries', () => {
     database.enqueue(two.id, 'en');
     const subtitles = { extract: vi.fn().mockResolvedValue({ text: 'subtitle text', candidate: { source: 'external', language: 'en' } }) };
     const summarizer = { summarize: vi.fn().mockResolvedValue('Shared recap') };
-    const queue = new GenerationQueue(testConfig({ mediaRoot: directory }), database, new PathMapper(directory, '/downloads', '/data'), subtitles as never, summarizer as never, new Logger('error'));
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+    const queue = new GenerationQueue(testConfig({ mediaRoot: directory }), database, new PathMapper(directory, '/downloads', '/data'), subtitles as never, summarizer as never, logger as never);
     await queue.processNext();
     await new Promise((resolve) => setTimeout(resolve, 20));
     queue.stop();
     expect(summarizer.summarize).toHaveBeenCalledTimes(1);
+    expect(logger.info).toHaveBeenCalledWith('summary generation received', {
+      itemId: one.id, language: 'en', recapCharacters: 12, recap: 'Shared recap'
+    });
     expect(database.getRecap(two.id, 'en')?.recap).toBe('Shared recap');
   });
 });

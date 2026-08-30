@@ -80,7 +80,8 @@ export class GenerationQueue {
         this.logger.info('summary generation received', {
           itemId: job.itemId,
           language: job.language,
-          recapCharacters: recap.length
+          recapCharacters: recap.length,
+          recap
         });
       }
       this.logger.info('generation completed', {

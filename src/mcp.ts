@@ -10,7 +10,7 @@ function createServer(config: Config, service: RecapService, logger: Logger): Mc
   const server = new McpServer({ name: 'recaparr', version: '0.1.2' });
   server.registerTool('get_recap', {
     title: 'Get movie or episode recap',
-    description: 'Returns a cached spoiler recap for a Jellyfin movie or episode. Cache misses and forced refreshes are asynchronous; call again after retryAfterSeconds.',
+    description: 'Returns a cached spoiler recap for a Jellyfin movie or episode. Cache misses and forced refreshes continue asynchronously; pending results indicate that generation is in progress.',
     inputSchema: {
       jellyfin_id: z.string().min(8).max(64).describe('Jellyfin movie or episode item ID'),
       force_regenerate: z.boolean().optional().default(false).describe('Regenerate this language even when a cached recap exists'),

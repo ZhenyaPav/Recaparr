@@ -94,8 +94,6 @@ export class RecapService {
       result.stale = true;
       if (recap.generatedAt) result.generatedAt = recap.generatedAt;
     }
-    if (recap.nextAttemptAt) result.retryAfterSeconds = Math.max(1, Math.ceil((Date.parse(recap.nextAttemptAt) - Date.now()) / 1000));
-    else result.retryAfterSeconds = 5;
     return result;
   }
 }

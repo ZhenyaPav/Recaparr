@@ -53,7 +53,6 @@ export interface GetRecapResult {
   recap?: string;
   generatedAt?: string;
   stale?: boolean;
-  retryAfterSeconds?: number;
   message?: string;
   availableLanguages?: string[];
 }

@@ -1,6 +1,6 @@
 # Recaparr
 
-Recaparr generates detailed, spoiler-filled movie and episode recaps from existing text subtitles. It stores recaps in SQLite and serves them through a Streamable HTTP MCP tool.
+Recaparr generates movie and episode recaps from existing text subtitles. It stores recaps in SQLite and serves them through a Streamable HTTP MCP tool.
 
 Media stays local. Recaparr extracts embedded or sidecar subtitle text with `ffprobe`/`ffmpeg`, then sends only the cleaned text to the configured OpenAI-compatible endpoint through the [`summarize`](https://github.com/steipete/summarize) CLI. It does not perform speech-to-text.
 
@@ -31,7 +31,7 @@ Jellyfin 10.11 item lookups require a user context. Set `JELLYFIN_USER_ID` to th
 
 Boolean settings `RECAPARR_EAGER_GENERATION` and `RECAPARR_LAZY_GENERATION` default to `true`. If lazy generation is disabled, both cache-miss generation and `force_regenerate` are rejected.
 
-`RECAPARR_LOG_LEVEL` defaults to `info`. Operational logs include MCP requests and results, webhook intake, Jellyfin resolution, cache decisions, subtitle selection, generation timing, and retry state. API keys, bearer tokens, and subtitle/recap contents are never logged.
+`RECAPARR_LOG_LEVEL` defaults to `info`. Operational logs include MCP requests and results, webhook intake, Jellyfin resolution, cache decisions, subtitle selection, generation timing, generated recap text, and retry state. API keys, bearer tokens, and subtitle contents are never logged.
 
 ## MCP
 
@@ -48,7 +48,7 @@ Connect an MCP client to `http://HOST:8182/mcp` and send `Authorization: Bearer 
 }
 ```
 
-`force_regenerate` and `language` are optional. Cache misses and refreshes are asynchronous: the result reports `queued`, `generating`, or `retrying` and includes `retryAfterSeconds`. Call the tool again after that interval. During forced regeneration, the previous recap is returned with `stale: true` until its replacement succeeds.
+`force_regenerate` and `language` are optional. Cache misses and refreshes are asynchronous: the result reports `queued`, `generating`, or `retrying` and indicates that generation is in progress. During forced regeneration, the previous recap is returned with `stale: true` until its replacement succeeds.
 
 ## Webhooks
 

@@ -20,7 +20,8 @@ describe('RecapService', () => {
   it('queues language-specific cache misses', async () => {
     const { service, queue } = setup();
     const result = await service.getRecap({ jellyfin_id: 'abcdef123456', language: 'ro' });
-    expect(result).toMatchObject({ status: 'queued', language: 'ro' });
+    expect(result).toMatchObject({ status: 'queued', language: 'ro', message: 'Recap generation is in progress' });
+    expect(result).not.toHaveProperty('retryAfterSeconds');
     expect(queue.wake).toHaveBeenCalled();
   });
 
@@ -37,7 +38,9 @@ describe('RecapService', () => {
     const item = database!.upsertItem({ kind: 'movie', jellyfinId: 'abcdef123456', path: '/media/a.mkv', title: 'A', tmdbId: '1' });
     database!.enqueue(item.id, 'en');
     database!.markSuccess(item.id, 'en', 'Old recap');
-    expect(await service.getRecap({ jellyfin_id: 'abcdef123456', force_regenerate: true })).toMatchObject({ status: 'regenerating', recap: 'Old recap', stale: true });
+    const result = await service.getRecap({ jellyfin_id: 'abcdef123456', force_regenerate: true });
+    expect(result).toMatchObject({ status: 'regenerating', recap: 'Old recap', stale: true, message: 'Recap generation is in progress' });
+    expect(result).not.toHaveProperty('retryAfterSeconds');
   });
 
   it('treats lazy generation as a hard kill switch', async () => {

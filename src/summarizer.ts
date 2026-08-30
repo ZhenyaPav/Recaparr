@@ -19,11 +19,13 @@ export class Summarizer {
       item.episodeNumber !== undefined ? `Episode: ${item.episodeNumber}` : ''
     ].filter(Boolean).join('\n');
     const input = `${context}\n\nSubtitle transcript:\n${transcript}`;
+    const thinkingArgs = this.config.llmThinking ? ['--thinking', this.config.llmThinking] : [];
     const result = await this.runner(this.config.summarizeBin, [
       '-', '--model', modelForSummarize(this.config.llmModel),
       '--prompt-file', this.config.promptFile,
       '--language', language,
       '--length', 'long',
+      ...thinkingArgs,
       '--force-summary', '--json', '--no-cache', '--no-color',
       '--timeout', `${this.config.generationTimeoutMs}ms`
     ], {

@@ -73,7 +73,8 @@ export class GenerationQueue {
         this.logger.info('summary generation requested', {
           itemId: job.itemId,
           language: job.language,
-          model: this.config.llmModel
+          model: this.config.llmModel,
+          thinking: this.config.llmThinking
         });
         const recap = await this.summarizer.summarize(text, job.item, job.language);
         this.database.markSuccess(job.itemId, job.language, recap);

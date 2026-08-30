@@ -27,14 +27,15 @@ const server = createServer(createApp(config, database, mapper, service, logger)
 queue.start();
 server.listen(config.port, '0.0.0.0', () => logger.info('Recaparr listening', {
   port: config.port,
-  version: '0.1.3',
+  version: '0.1.4',
   eagerGeneration: config.eagerGeneration,
   lazyGeneration: config.lazyGeneration,
   preferredSubtitleLanguage: config.preferredSubtitleLanguage,
   summaryLanguage: config.summaryLanguage,
   jellyfinUserConfigured: Boolean(config.jellyfinUserId),
   llmBaseUrl: config.llmBaseUrl,
-  llmModel: config.llmModel
+  llmModel: config.llmModel,
+  llmThinking: config.llmThinking
 }));
 
 function shutdown(signal: string): void {

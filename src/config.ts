@@ -6,6 +6,7 @@ export interface Config {
   llmApiKey: string;
   llmBaseUrl: string;
   llmModel: string;
+  llmThinking?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
   eagerGeneration: boolean;
   lazyGeneration: boolean;
   preferredSubtitleLanguage: string;
@@ -48,6 +49,15 @@ function positiveInteger(value: string | undefined, fallback: number, name: stri
   return parsed;
 }
 
+function thinkingLevel(value: string | undefined): Config['llmThinking'] {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (!['none', 'low', 'medium', 'high', 'xhigh'].includes(normalized)) {
+    throw new Error('RECAPARR_LLM_THINKING must be one of: none, low, medium, high, xhigh');
+  }
+  return normalized as Config['llmThinking'];
+}
+
 export function normalizeLanguage(value: string): string {
   const normalized = value.trim();
   if (!LANGUAGE_RE.test(normalized)) {
@@ -74,6 +84,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     llmApiKey: required(env, 'RECAPARR_LLM_API_KEY'),
     llmBaseUrl: (env.RECAPARR_LLM_BASE_URL ?? 'https://openrouter.ai/api/v1').replace(/\/$/, ''),
     llmModel: env.RECAPARR_LLM_MODEL?.trim() || 'deepseek/deepseek-v4-flash-latest',
+    llmThinking: thinkingLevel(env.RECAPARR_LLM_THINKING),
     eagerGeneration: booleanValue(env.RECAPARR_EAGER_GENERATION, true),
     lazyGeneration: booleanValue(env.RECAPARR_LAZY_GENERATION, true),
     preferredSubtitleLanguage: normalizeLanguage(env.RECAPARR_PREFERRED_SUBTITLE_LANGUAGE ?? 'en'),

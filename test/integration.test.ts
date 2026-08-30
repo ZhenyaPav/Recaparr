@@ -90,7 +90,9 @@ describe('service integration boundaries', () => {
 
   it('sends cleaned text, not a media path, to summarize', async () => {
     let observedInput = '';
-    const runner = vi.fn(async (_command: string, _args: string[], options?: { input?: string }) => {
+    let observedArgs: string[] = [];
+    const runner = vi.fn(async (_command: string, args: string[], options?: { input?: string }) => {
+      observedArgs = args;
       observedInput = options?.input ?? '';
       return { stdout: JSON.stringify({ summary: 'Generated recap' }), stderr: '' };
     });
@@ -101,6 +103,21 @@ describe('service integration boundaries', () => {
     expect(result).toBe('Generated recap');
     expect(observedInput).toContain('Only subtitle dialogue.');
     expect(observedInput).not.toContain('/media/secret/movie.mkv');
+    expect(observedArgs).not.toContain('--thinking');
+  });
+
+  it('passes an explicitly configured thinking level to summarize', async () => {
+    let observedArgs: string[] = [];
+    const runner = vi.fn(async (_command: string, args: string[]) => {
+      observedArgs = args;
+      return { stdout: JSON.stringify({ summary: 'Generated recap' }), stderr: '' };
+    });
+    const summarizer = new Summarizer(testConfig({ llmThinking: 'high' }), runner as never);
+    await summarizer.summarize('Only subtitle dialogue.', {
+      id: 1, kind: 'movie', path: '/media/movie.mkv', title: 'Movie', createdAt: '', updatedAt: ''
+    }, 'en');
+    expect(observedArgs).toContain('--thinking');
+    expect(observedArgs[observedArgs.indexOf('--thinking') + 1]).toBe('high');
   });
 
   it('processes one queued generation and reuses it for a shared file', async () => {

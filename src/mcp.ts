@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Config } from './config.js';
 import type { Logger } from './logger.js';
+import { JELLYFIN_ID_RE } from './jellyfin.js';
 import { RecapServiceError, type RecapService } from './recap-service.js';
 
 function createServer(config: Config, service: RecapService, logger: Logger): McpServer {
@@ -12,7 +13,7 @@ function createServer(config: Config, service: RecapService, logger: Logger): Mc
     title: 'Get movie or episode recap',
     description: 'Returns a cached spoiler recap for a Jellyfin movie or episode. Cache misses and forced refreshes continue asynchronously; pending results indicate that generation is in progress.',
     inputSchema: {
-      jellyfin_id: z.string().min(8).max(64).describe('Jellyfin movie or episode item ID'),
+      jellyfin_id: z.string().regex(JELLYFIN_ID_RE, 'Expected a 32-character hexadecimal Jellyfin GUID').describe('Jellyfin movie or episode item ID'),
       force_regenerate: z.boolean().optional().default(false).describe('Regenerate this language even when a cached recap exists'),
       language: z.string().optional().default(config.summaryLanguage).describe('BCP-47 output language; defaults to server configuration')
     }

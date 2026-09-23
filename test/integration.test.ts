@@ -31,21 +31,23 @@ describe('service integration boundaries', () => {
   });
 
   it('resolves Jellyfin episodes and their series provider identity', async () => {
+    const episodeId = '11111111111111111111111111111111';
+    const seriesId = '22222222222222222222222222222222';
     const requests: Request[] = [];
     const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const request = new Request(input, init);
       requests.push(request);
-      if (request.url.includes('/Items/episode123')) return new Response(JSON.stringify({
-        Id: 'episode123', Name: 'Pilot', Type: 'Episode', Path: '/data/tv/Show.S01E01.mkv',
-        SeriesId: 'series123', SeriesName: 'Show', ParentIndexNumber: 1, IndexNumber: 1, ProviderIds: { Tvdb: '101' }
+      if (request.url.includes(`/Items/${episodeId}`)) return new Response(JSON.stringify({
+        Id: episodeId, Name: 'Pilot', Type: 'Episode', Path: '/data/tv/Show.S01E01.mkv',
+        SeriesId: seriesId, SeriesName: 'Show', ParentIndexNumber: 1, IndexNumber: 1, ProviderIds: { Tvdb: '101' }
       }), { status: 200 });
-      return new Response(JSON.stringify({ Id: 'series123', Name: 'Show', Type: 'Series', ProviderIds: { Tvdb: '99' } }), { status: 200 });
+      return new Response(JSON.stringify({ Id: seriesId, Name: 'Show', Type: 'Series', ProviderIds: { Tvdb: '99' } }), { status: 200 });
     });
     const client = new JellyfinClient('http://jellyfin:8096', 'secret-key', new PathMapper('/media', '/downloads', '/data'), {
       userId: 'user123',
       fetchImpl: fakeFetch as typeof fetch
     });
-    await expect(client.resolve('episode123')).resolves.toMatchObject({
+    await expect(client.resolve(episodeId)).resolves.toMatchObject({
       kind: 'episode', path: '/media/tv/Show.S01E01.mkv', tvdbId: '101', seriesTvdbId: '99', seasonNumber: 1, episodeNumber: 1
     });
     expect(requests.every((request) => request.headers.get('X-Emby-Token') === 'secret-key')).toBe(true);
@@ -54,6 +56,7 @@ describe('service integration boundaries', () => {
   });
 
   it('automatically selects an enabled Jellyfin administrator once', async () => {
+    const movieId = '33333333333333333333333333333333';
     const requests: Request[] = [];
     const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const request = new Request(input, init);
@@ -64,15 +67,15 @@ describe('service integration boundaries', () => {
         { Id: 'admin-user', Policy: { IsAdministrator: true, IsDisabled: false } }
       ]));
       return new Response(JSON.stringify({
-        Id: 'movie123', Name: 'Movie', Type: 'Movie', Path: '/data/movies/Movie.mkv'
+        Id: movieId, Name: 'Movie', Type: 'Movie', Path: '/data/movies/Movie.mkv'
       }));
     });
     const client = new JellyfinClient('http://jellyfin:8096', 'secret-key', new PathMapper('/media', '/downloads', '/data'), {
       fetchImpl: fakeFetch as typeof fetch
     });
 
-    await client.resolve('movie123');
-    await client.resolve('movie123');
+    await client.resolve(movieId);
+    await client.resolve(movieId);
 
     expect(requests.filter((request) => request.url.endsWith('/Users'))).toHaveLength(1);
     expect(requests.filter((request) => request.url.includes('/Items/')).every((request) =>
@@ -85,7 +88,20 @@ describe('service integration boundaries', () => {
       userId: 'user123',
       fetchImpl: fakeFetch as typeof fetch
     });
-    await expect(client.resolve('movie123')).rejects.toThrow('HTTP 400: Readable Jellyfin error');
+    await expect(client.resolve('33333333333333333333333333333333')).rejects.toThrow('HTTP 400: Readable Jellyfin error');
+  });
+
+  it('rejects malformed Jellyfin item IDs before making a request', async () => {
+    const fakeFetch = vi.fn();
+    const client = new JellyfinClient('http://jellyfin:8096', 'secret-key', new PathMapper('/media', '/downloads', '/data'), {
+      userId: '0123456789abcdef0123456789abcdef',
+      fetchImpl: fakeFetch as typeof fetch
+    });
+
+    await expect(client.resolve('7e895da8b65cd6600963ecfc7e7b92d')).rejects.toThrow(
+      'expected a 32-character hexadecimal GUID'
+    );
+    expect(fakeFetch).not.toHaveBeenCalled();
   });
 
   it('sends cleaned text, not a media path, to summarize', async () => {

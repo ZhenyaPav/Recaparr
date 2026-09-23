@@ -26,6 +26,8 @@ interface JellyfinClientOptions {
   fetchImpl?: typeof fetch;
 }
 
+export const JELLYFIN_ID_RE = /^(?:[a-f\d]{32}|[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12})$/i;
+
 export class JellyfinClient {
   private userId?: string;
   private userResolution?: Promise<string>;
@@ -44,7 +46,9 @@ export class JellyfinClient {
   }
 
   async resolve(jellyfinId: string): Promise<MediaIdentity> {
-    if (!/^[A-Za-z0-9-]{8,64}$/.test(jellyfinId)) throw new Error('Invalid Jellyfin item ID');
+    if (!JELLYFIN_ID_RE.test(jellyfinId)) {
+      throw new Error('Invalid Jellyfin item ID: expected a 32-character hexadecimal GUID');
+    }
     this.logger?.info('Jellyfin item lookup started', { jellyfinId });
     const item = await this.getItem(jellyfinId);
     const jellyfinPath = item.Path ?? item.MediaSources?.find((source) => source.Path)?.Path;

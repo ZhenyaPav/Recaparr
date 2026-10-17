@@ -15,18 +15,15 @@ RUN npm run build \
 FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
-    HOME=/home/node \
-    PATH=/app/node_modules/.bin:$PATH \
     RECAPARR_DATABASE_PATH=/data/recaparr.sqlite \
     RECAPARR_MEDIA_ROOT=/media \
-    RECAPARR_PROMPT_FILE=/app/prompts/recap.md \
-    RECAPARR_SUMMARIZE_BIN=/app/node_modules/.bin/summarize
+    RECAPARR_PROMPT_FILE=/app/prompts/recap.md
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates ffmpeg tini \
   && rm -rf /var/lib/apt/lists/* \
-  && mkdir -p /data /home/node/.summarize \
-  && chown -R node:node /data /home/node
+  && mkdir -p /data \
+  && chown node:node /data
 
 WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./

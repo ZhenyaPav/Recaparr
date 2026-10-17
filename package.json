@@ -1,6 +1,6 @@
 {
   "name": "recaparr",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Subtitle-driven movie and TV episode recaps over MCP",
   "type": "module",
   "engines": {
@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
-    "@steipete/summarize": "0.21.11",
     "better-sqlite3": "12.4.1",
     "express": "5.2.1",
     "zod": "4.4.3"

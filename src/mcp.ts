@@ -8,7 +8,7 @@ import { JELLYFIN_ID_RE } from './jellyfin.js';
 import { RecapServiceError, type RecapService } from './recap-service.js';
 
 function createServer(config: Config, service: RecapService, logger: Logger): McpServer {
-  const server = new McpServer({ name: 'recaparr', version: '0.1.5' });
+  const server = new McpServer({ name: 'recaparr', version: '0.1.6' });
   server.registerTool('get_recap', {
     title: 'Get movie or episode recap',
     description: 'Returns a cached spoiler recap for a Jellyfin movie or episode. Cache misses and forced refreshes continue asynchronously; pending results indicate that generation is in progress.',

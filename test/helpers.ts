@@ -20,7 +20,6 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     jellyfinPathPrefix: '/data',
     retryDelaysMs: [300_000, 1_800_000],
     generationTimeoutMs: 600_000,
-    summarizeBin: 'summarize',
     ffmpegBin: 'ffmpeg',
     ffprobeBin: 'ffprobe',
     promptFile: '/app/prompts/recap.md',

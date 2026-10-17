@@ -2,7 +2,7 @@
 
 Recaparr generates movie and episode recaps from existing text subtitles. It stores recaps in SQLite and serves them through a Streamable HTTP MCP tool.
 
-Media stays local. Recaparr extracts embedded or sidecar subtitle text with `ffprobe`/`ffmpeg`, then sends only the cleaned text to the configured OpenAI-compatible endpoint through the [`summarize`](https://github.com/steipete/summarize) CLI. It does not perform speech-to-text.
+Media stays local. Recaparr extracts embedded or sidecar subtitle text with `ffprobe`/`ffmpeg`, then sends the cleaned text and title/episode metadata directly to the configured OpenAI-compatible `/chat/completions` endpoint using Node's built-in `fetch`. It does not perform speech-to-text.
 
 ## Features
 
@@ -25,7 +25,7 @@ Copy `.env.example` to `.env` for local development. The following values are re
 | `JELLYFIN_API_KEY` | Jellyfin API key used to resolve item IDs and paths |
 | `JELLYFIN_USER_ID` | Optional Jellyfin library user ID; recommended for deterministic library access |
 
-The default LLM endpoint is `https://openrouter.ai/api/v1`, and the default model is `deepseek/deepseek-v4-flash-latest`. Optional `RECAPARR_LLM_THINKING` controls the `summarize --thinking` level and accepts `none`, `low`, `medium`, `high`, or `xhigh`. When unset, Recaparr does not pass `--thinking`, leaving the model/provider default unchanged. `RECAPARR_PREFERRED_SUBTITLE_LANGUAGE` controls subtitle selection; `RECAPARR_SUMMARY_LANGUAGE` controls eager recap output and the MCP default. Both default to `en`.
+The default LLM endpoint is `https://openrouter.ai/api/v1`, and the default model is `deepseek/deepseek-v4-flash-latest`. Set `RECAPARR_LLM_BASE_URL` to the API base URL (including `/v1` for llama.cpp); `RECAPARR_LLM_MODEL` is sent unchanged. Optional `RECAPARR_LLM_THINKING` sends `reasoning_effort` and accepts `none`, `low`, `medium`, `high`, or `xhigh`. Setting it to `none` disables thinking on compatible servers such as llama.cpp. When unset, the field is omitted, leaving the model/provider default unchanged. `RECAPARR_PREFERRED_SUBTITLE_LANGUAGE` controls subtitle selection; `RECAPARR_SUMMARY_LANGUAGE` controls eager recap output and the MCP default. Both default to `en`.
 
 Jellyfin 10.11 item lookups require a user context. Set `JELLYFIN_USER_ID` to the ID of a user that can access the relevant libraries. If omitted, Recaparr selects the first enabled administrator, or the first enabled user when no administrator is available. The selection is cached for the lifetime of the process.
 
@@ -83,7 +83,7 @@ Recaparr supports text-based embedded tracks and matching `.srt`, `.vtt`, `.ass`
 
 ## Development
 
-Node.js 24 is required for the real `summarize` CLI.
+Node.js 24 is required.
 
 ```bash
 npm ci

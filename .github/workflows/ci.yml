@@ -37,7 +37,6 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke-test image tools and database
         run: |
-          docker run --rm recaparr:test summarize --version
           docker run --rm recaparr:test ffprobe -version
           docker run --rm recaparr:test node -e "const Database=require('better-sqlite3'); const db=new Database(':memory:'); db.prepare('select 1').get(); db.close()"
       - name: Smoke-test service health

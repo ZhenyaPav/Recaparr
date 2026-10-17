@@ -20,7 +20,6 @@ export interface Config {
   jellyfinPathPrefix: string;
   retryDelaysMs: number[];
   generationTimeoutMs: number;
-  summarizeBin: string;
   ffmpegBin: string;
   ffprobeBin: string;
   promptFile: string;
@@ -98,7 +97,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jellyfinPathPrefix: path.posix.resolve(env.RECAPARR_JELLYFIN_PATH_PREFIX ?? '/data'),
     retryDelaysMs: retryMinutes.map((minutes) => minutes * 60_000),
     generationTimeoutMs: positiveInteger(env.RECAPARR_GENERATION_TIMEOUT_MS, 600_000, 'RECAPARR_GENERATION_TIMEOUT_MS'),
-    summarizeBin: env.RECAPARR_SUMMARIZE_BIN ?? 'summarize',
     ffmpegBin: env.RECAPARR_FFMPEG_BIN ?? 'ffmpeg',
     ffprobeBin: env.RECAPARR_FFPROBE_BIN ?? 'ffprobe',
     promptFile,

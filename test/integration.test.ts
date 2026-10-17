@@ -104,36 +104,79 @@ describe('service integration boundaries', () => {
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
-  it('sends cleaned text, not a media path, to summarize', async () => {
-    let observedInput = '';
-    let observedArgs: string[] = [];
-    const runner = vi.fn(async (_command: string, args: string[], options?: { input?: string }) => {
-      observedArgs = args;
-      observedInput = options?.input ?? '';
-      return { stdout: JSON.stringify({ summary: 'Generated recap' }), stderr: '' };
+  it.each([
+    ['https://openrouter.ai/api/v1', undefined],
+    ['https://openrouter.ai/api/v1', 'none'],
+    ['http://127.0.0.1:18080/v1/', 'none'],
+    ['http://127.0.0.1:18080/v1', 'high']
+  ] as const)('sends subtitle text directly to %s with thinking %s', async (llmBaseUrl, llmThinking) => {
+    const requests: Request[] = [];
+    const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      requests.push(new Request(input, init));
+      return Response.json({ choices: [{ message: { content: ' Generated recap ' }, finish_reason: 'stop' }] });
     });
-    const summarizer = new Summarizer(testConfig(), runner as never);
+    const summarizer = new Summarizer(testConfig({
+      llmBaseUrl, llmThinking, promptFile: path.resolve('prompts/recap.md')
+    }), fakeFetch as typeof fetch);
     const result = await summarizer.summarize('Only subtitle dialogue.', {
-      id: 1, kind: 'movie', path: '/media/secret/movie.mkv', title: 'Movie', createdAt: '', updatedAt: ''
-    }, 'en');
+      id: 1, kind: 'episode', path: '/media/secret/episode.mkv', title: 'Pilot', seriesTitle: 'Show',
+      seasonNumber: 1, episodeNumber: 2, createdAt: '', updatedAt: ''
+    }, 'ro');
     expect(result).toBe('Generated recap');
-    expect(observedInput).toContain('Only subtitle dialogue.');
-    expect(observedInput).not.toContain('/media/secret/movie.mkv');
-    expect(observedArgs).not.toContain('--thinking');
+    expect(fakeFetch).toHaveBeenCalledOnce();
+    const request = requests[0]!;
+    expect(request.url).toBe(`${llmBaseUrl.replace(/\/$/, '')}/chat/completions`);
+    expect(request.method).toBe('POST');
+    expect(request.headers.get('Authorization')).toBe('Bearer test-key');
+    expect(request.headers.get('Content-Type')).toBe('application/json');
+    const body = await request.json();
+    expect(body).toEqual({
+      model: 'deepseek/deepseek-v4-flash-latest',
+      messages: [
+        { role: 'system', content: `${(await fs.readFile('prompts/recap.md', 'utf8')).trim()}\n\nWrite the recap in ro.` },
+        { role: 'user', content: 'Media type: episode\nTitle: Pilot\nSeries: Show\nSeason: 1\nEpisode: 2\n\nSubtitle transcript:\nOnly subtitle dialogue.' }
+      ],
+      stream: false,
+      ...(llmThinking ? { reasoning_effort: llmThinking } : {})
+    });
+    expect(JSON.stringify(body)).not.toContain('/media/secret/episode.mkv');
   });
 
-  it('passes an explicitly configured thinking level to summarize', async () => {
-    let observedArgs: string[] = [];
-    const runner = vi.fn(async (_command: string, args: string[]) => {
-      observedArgs = args;
-      return { stdout: JSON.stringify({ summary: 'Generated recap' }), stderr: '' };
-    });
-    const summarizer = new Summarizer(testConfig({ llmThinking: 'high' }), runner as never);
-    await summarizer.summarize('Only subtitle dialogue.', {
+  it.each([
+    ['not JSON', 'LLM returned invalid JSON'],
+    ['{}', 'LLM returned an invalid chat completion'],
+    ['{"choices":[]}', 'LLM returned an invalid chat completion'],
+    ['{"choices":[{"message":{"content":42}}]}', 'LLM returned an invalid chat completion'],
+    ['{"choices":[{"message":{"content":null,"reasoning_content":"Only thinking"}}]}', 'LLM returned an empty recap'],
+    ['{"choices":[{"message":{"content":"  "}}]}', 'LLM returned an empty recap'],
+    ['{"choices":[{"message":{"content":"Partial recap"},"finish_reason":"length"}]}', 'LLM response was truncated']
+  ])('rejects unusable LLM response %s', async (body, message) => {
+    const fakeFetch = vi.fn().mockResolvedValue(new Response(body));
+    const summarizer = new Summarizer(testConfig({ promptFile: path.resolve('prompts/recap.md') }), fakeFetch);
+    await expect(summarizer.summarize('Subtitle dialogue.', {
       id: 1, kind: 'movie', path: '/media/movie.mkv', title: 'Movie', createdAt: '', updatedAt: ''
-    }, 'en');
-    expect(observedArgs).toContain('--thinking');
-    expect(observedArgs[observedArgs.indexOf('--thinking') + 1]).toBe('high');
+    }, 'en')).rejects.toThrow(message);
+  });
+
+  it('reports provider HTTP errors without making internal retries', async () => {
+    const fakeFetch = vi.fn().mockResolvedValue(new Response('Insufficient credits', { status: 402 }));
+    const summarizer = new Summarizer(testConfig({ promptFile: path.resolve('prompts/recap.md') }), fakeFetch);
+    await expect(summarizer.summarize('Subtitle dialogue.', {
+      id: 1, kind: 'movie', path: '/media/movie.mkv', title: 'Movie', createdAt: '', updatedAt: ''
+    }, 'en')).rejects.toThrow('LLM request failed with HTTP 402: Insufficient credits');
+    expect(fakeFetch).toHaveBeenCalledOnce();
+  });
+
+  it('aborts generation at the configured timeout', async () => {
+    const fakeFetch = vi.fn((_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true });
+    }));
+    const summarizer = new Summarizer(testConfig({
+      promptFile: path.resolve('prompts/recap.md'), generationTimeoutMs: 20
+    }), fakeFetch as typeof fetch);
+    await expect(summarizer.summarize('Subtitle dialogue.', {
+      id: 1, kind: 'movie', path: '/media/movie.mkv', title: 'Movie', createdAt: '', updatedAt: ''
+    }, 'en')).rejects.toMatchObject({ name: 'TimeoutError' });
   });
 
   it('upgrades an existing database and persists forced generation across restarts', async () => {

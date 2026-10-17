@@ -1,14 +1,17 @@
+import fs from 'node:fs/promises';
+import { z } from 'zod';
 import type { Config } from './config.js';
 import type { MediaItem } from './types.js';
-import type { ProcessRunner } from './process.js';
-import { runProcess } from './process.js';
 
-function modelForSummarize(model: string): string {
-  return model.startsWith('openai/') ? model : `openai/${model}`;
-}
+const completionSchema = z.object({
+  choices: z.array(z.object({
+    message: z.object({ content: z.string().nullish() }),
+    finish_reason: z.string().nullish()
+  })).nonempty()
+});
 
 export class Summarizer {
-  constructor(private readonly config: Config, private readonly runner: ProcessRunner = runProcess) {}
+  constructor(private readonly config: Config, private readonly fetchImpl: typeof fetch = fetch) {}
 
   async summarize(transcript: string, item: MediaItem, language: string): Promise<string> {
     const context = [
@@ -19,32 +22,37 @@ export class Summarizer {
       item.episodeNumber !== undefined ? `Episode: ${item.episodeNumber}` : ''
     ].filter(Boolean).join('\n');
     const input = `${context}\n\nSubtitle transcript:\n${transcript}`;
-    const thinkingArgs = this.config.llmThinking ? ['--thinking', this.config.llmThinking] : [];
-    const result = await this.runner(this.config.summarizeBin, [
-      '-', '--model', modelForSummarize(this.config.llmModel),
-      '--prompt-file', this.config.promptFile,
-      '--language', language,
-      '--length', 'long',
-      ...thinkingArgs,
-      '--force-summary', '--json', '--no-cache', '--no-color',
-      '--timeout', `${this.config.generationTimeoutMs}ms`
-    ], {
-      input,
-      timeoutMs: this.config.generationTimeoutMs + 10_000,
-      env: {
-        ...process.env,
-        OPENAI_API_KEY: this.config.llmApiKey,
-        OPENAI_BASE_URL: this.config.llmBaseUrl,
-        OPENAI_USE_CHAT_COMPLETIONS: 'true',
-        NO_COLOR: '1'
-      }
+    const prompt = await fs.readFile(this.config.promptFile, 'utf8');
+    const response = await this.fetchImpl(`${this.config.llmBaseUrl.replace(/\/+$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.config.llmApiKey}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(this.config.generationTimeoutMs),
+      body: JSON.stringify({
+        model: this.config.llmModel,
+        messages: [
+          { role: 'system', content: `${prompt.trim()}\n\nWrite the recap in ${language}.` },
+          { role: 'user', content: input }
+        ],
+        stream: false,
+        ...(this.config.llmThinking ? { reasoning_effort: this.config.llmThinking } : {})
+      })
     });
+    if (!response.ok) {
+      const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 500);
+      throw new Error(`LLM request failed with HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+    }
     let payload: unknown;
-    try { payload = JSON.parse(result.stdout); }
-    catch { throw new Error(`summarize returned invalid JSON: ${result.stdout.slice(0, 500)}`); }
-    const summary = typeof payload === 'object' && payload !== null && 'summary' in payload
-      ? (payload as { summary?: unknown }).summary : undefined;
-    if (typeof summary !== 'string' || !summary.trim()) throw new Error('summarize returned an empty summary');
-    return summary.trim();
+    try { payload = await response.json(); }
+    catch (error) {
+      if (error instanceof SyntaxError) throw new Error('LLM returned invalid JSON', { cause: error });
+      throw error;
+    }
+    const completion = completionSchema.safeParse(payload);
+    if (!completion.success) throw new Error('LLM returned an invalid chat completion');
+    const choice = completion.data.choices[0]!;
+    if (choice.finish_reason === 'length') throw new Error('LLM response was truncated (finish_reason: length)');
+    const summary = choice.message.content?.trim();
+    if (!summary) throw new Error('LLM returned an empty recap');
+    return summary;
   }
 }

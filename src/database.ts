@@ -94,10 +94,14 @@ export class RecapDatabase {
         next_attempt_at TEXT,
         generated_at TEXT,
         requested_at TEXT NOT NULL,
+        force_regenerate INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (item_id, language)
       );
       CREATE INDEX IF NOT EXISTS idx_recaps_due ON recaps(status, next_attempt_at);
     `);
+    if (!(this.db.pragma('table_info(recaps)') as DbRow[]).some((column) => column.name === 'force_regenerate')) {
+      this.db.exec('ALTER TABLE recaps ADD COLUMN force_regenerate INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   upsertItem(identity: MediaIdentity): MediaItem {
@@ -187,16 +191,17 @@ export class RecapDatabase {
 
   enqueue(itemId: number, language: string, force = false): RecapRecord {
     const current = this.getRecap(itemId, language);
-    if (current && ['queued', 'generating', 'retrying'].includes(current.status)) return current;
-    if (current?.status === 'completed' && !force) return current;
+    if (!force && current && ['queued', 'generating', 'retrying', 'completed'].includes(current.status)) return current;
     const timestamp = now();
     this.db.prepare(`
-      INSERT INTO recaps (item_id, language, status, recap, error, attempts, next_attempt_at, generated_at, requested_at)
-      VALUES (?, ?, 'queued', NULL, NULL, 0, ?, NULL, ?)
+      INSERT INTO recaps (item_id, language, status, recap, error, attempts, next_attempt_at, generated_at, requested_at, force_regenerate)
+      VALUES (?, ?, 'queued', NULL, NULL, 0, ?, NULL, ?, ?)
       ON CONFLICT(item_id, language) DO UPDATE SET
-        status = 'queued', error = NULL, attempts = 0, next_attempt_at = excluded.next_attempt_at,
-        requested_at = excluded.requested_at
-    `).run(itemId, language, timestamp, timestamp);
+        status = CASE WHEN recaps.status = 'generating' THEN 'generating' ELSE 'queued' END,
+        recap = NULL, error = NULL, generated_at = NULL, attempts = 0,
+        next_attempt_at = CASE WHEN recaps.status = 'generating' THEN NULL ELSE excluded.next_attempt_at END,
+        requested_at = excluded.requested_at, force_regenerate = excluded.force_regenerate
+    `).run(itemId, language, timestamp, timestamp, force ? 1 : 0);
     return this.getRecap(itemId, language)!;
   }
 
@@ -217,7 +222,7 @@ export class RecapDatabase {
     for (const [key, value] of Object.entries(row)) {
       if (key.startsWith('i_')) itemRow[key.slice(2)] = value;
     }
-    return { ...mapRecap(row), item: mapItem(itemRow) };
+    return { ...mapRecap(row), item: mapItem(itemRow), forceRegenerate: Boolean(row.force_regenerate) };
   }
 
   markGenerating(itemId: number, language: string): void {

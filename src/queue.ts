@@ -50,7 +50,7 @@ export class GenerationQueue {
       attempt: job.attempts + 1
     });
     try {
-      const shared = this.database.completedRecapForPath(job.item.path, job.language, job.itemId);
+      const shared = job.forceRegenerate ? undefined : this.database.completedRecapForPath(job.item.path, job.language, job.itemId);
       if (shared?.recap) {
         this.database.markSuccess(job.itemId, job.language, shared.recap);
         this.logger.info('generation reused recap for shared media file', {

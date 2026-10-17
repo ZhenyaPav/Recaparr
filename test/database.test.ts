@@ -13,7 +13,7 @@ describe('RecapDatabase', () => {
     expect(resolved.jellyfinId).toBe('abcdef123456');
   });
 
-  it('stores recaps per language and preserves stale text during force regeneration', () => {
+  it('invalidates only the forced language while preserving other cached recaps', () => {
     database = new RecapDatabase(':memory:');
     const item = database.upsertItem({ kind: 'movie', path: '/media/a.mkv', title: 'A', tmdbId: '1' });
     database.enqueue(item.id, 'en');
@@ -22,8 +22,10 @@ describe('RecapDatabase', () => {
     database.markSuccess(item.id, 'ro', 'Recapitulare');
     const forced = database.enqueue(item.id, 'en', true);
     expect(forced.status).toBe('queued');
-    expect(forced.recap).toBe('Old recap');
-    expect(database.availableLanguages(item.id)).toEqual(['en', 'ro']);
+    expect(forced.recap).toBeNull();
+    expect(forced.generatedAt).toBeNull();
+    expect(database.getRecap(item.id, 'ro')?.recap).toBe('Recapitulare');
+    expect(database.availableLanguages(item.id)).toEqual(['ro']);
   });
 
   it('persists bounded retries and ends in failed state', () => {
@@ -31,8 +33,11 @@ describe('RecapDatabase', () => {
     const item = database.upsertItem({ kind: 'movie', path: '/media/a.mkv', title: 'A' });
     database.enqueue(item.id, 'en');
     database.markGenerating(item.id, 'en');
-    expect(database.markFailure(item.id, 'en', 'missing subtitles', [1]).status).toBe('retrying');
-    expect(database.markFailure(item.id, 'en', 'still missing', [1]).status).toBe('failed');
+    const retrying = database.markFailure(item.id, 'en', 'missing subtitles', [60_000]);
+    expect(retrying.status).toBe('retrying');
+    expect(database.enqueue(item.id, 'en')).toEqual(retrying);
+    expect(database.nextDueJob()).toBeUndefined();
+    expect(database.markFailure(item.id, 'en', 'still missing', [60_000]).status).toBe('failed');
   });
 
   it('reuses a completed recap for another logical episode sharing a file', () => {

@@ -136,7 +136,28 @@ describe('service integration boundaries', () => {
     expect(observedArgs[observedArgs.indexOf('--thinking') + 1]).toBe('high');
   });
 
-  it('processes one queued generation and reuses it for a shared file', async () => {
+  it('upgrades an existing database and persists forced generation across restarts', async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'recaparr-migration-'));
+    cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
+    const filename = path.join(directory, 'recaps.sqlite');
+    let database = new RecapDatabase(filename);
+    cleanup.push(() => database.close());
+    const item = database.upsertItem({ kind: 'movie', path: '/media/movie.mkv', title: 'Movie' });
+    database.enqueue(item.id, 'en');
+    database.markSuccess(item.id, 'en', 'Old recap');
+    database.db.exec('ALTER TABLE recaps DROP COLUMN force_regenerate');
+    database.close();
+
+    database = new RecapDatabase(filename);
+    expect(database.getRecap(item.id, 'en')?.recap).toBe('Old recap');
+    database.enqueue(item.id, 'en', true);
+    database.close();
+
+    database = new RecapDatabase(filename);
+    expect(database.nextDueJob()).toMatchObject({ itemId: item.id, forceRegenerate: true, recap: null, error: null });
+  });
+
+  it('reuses recaps for a shared file but generates fresh text when forced', async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'recaparr-queue-'));
     cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
     const mediaPath = path.join(directory, 'double.mkv');
@@ -148,16 +169,23 @@ describe('service integration boundaries', () => {
     database.enqueue(one.id, 'en');
     database.enqueue(two.id, 'en');
     const subtitles = { extract: vi.fn().mockResolvedValue({ text: 'subtitle text', candidate: { source: 'external', language: 'en' } }) };
-    const summarizer = { summarize: vi.fn().mockResolvedValue('Shared recap') };
+    const summarizer = { summarize: vi.fn().mockResolvedValueOnce('Shared recap').mockResolvedValue('Fresh recap') };
     const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
     const queue = new GenerationQueue(testConfig({ mediaRoot: directory }), database, new PathMapper(directory, '/downloads', '/data'), subtitles as never, summarizer as never, logger as never);
+    vi.spyOn(queue, 'wake').mockImplementation(() => {});
     await queue.processNext();
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    queue.stop();
+    await queue.processNext();
     expect(summarizer.summarize).toHaveBeenCalledTimes(1);
     expect(logger.info).toHaveBeenCalledWith('summary generation received', {
       itemId: one.id, language: 'en', recapCharacters: 12, recap: 'Shared recap'
     });
     expect(database.getRecap(two.id, 'en')?.recap).toBe('Shared recap');
+
+    database.enqueue(two.id, 'en', true);
+    expect(database.getRecap(two.id, 'en')?.recap).toBeNull();
+    await queue.processNext();
+    expect(summarizer.summarize).toHaveBeenCalledTimes(2);
+    expect(database.getRecap(two.id, 'en')?.recap).toBe('Fresh recap');
+    expect(database.getRecap(one.id, 'en')?.recap).toBe('Shared recap');
   });
 });

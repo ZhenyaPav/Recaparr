@@ -48,14 +48,10 @@ export class RecapService {
 
     if (input.force_regenerate) {
       if (!this.config.lazyGeneration) throw this.disabledError(item.id, language, 'Forced regeneration is disabled');
-      if (!active) {
-        recap = this.database.enqueue(item.id, language, true);
-        this.logger.info('forced regeneration queued', { itemId: item.id, language, retainedRecap: Boolean(recap.recap) });
-      } else {
-        this.logger.info('forced regeneration deduplicated', { itemId: item.id, language, status: recap!.status });
-      }
+      recap = this.database.enqueue(item.id, language, true);
+      this.logger.info('forced regeneration requested', { itemId: item.id, language, status: recap.status });
       this.queue.wake();
-      return this.pendingResult(item, recap!, true);
+      return this.pendingResult(item, recap, true);
     }
 
     if (recap?.status === 'completed' && recap.recap) {
@@ -71,7 +67,7 @@ export class RecapService {
     }
     if (!this.config.lazyGeneration) throw this.disabledError(item.id, language, 'No cached recap exists and lazy generation is disabled');
 
-    recap = this.database.enqueue(item.id, language, true);
+    recap = this.database.enqueue(item.id, language);
     this.logger.info('lazy generation queued', { itemId: item.id, language });
     this.queue.wake();
     return this.pendingResult(item, recap, Boolean(recap.recap));

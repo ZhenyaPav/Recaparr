@@ -33,14 +33,26 @@ describe('RecapService', () => {
     expect(await service.getRecap({ jellyfin_id: 'abcdef123456' })).toMatchObject({ status: 'completed', recap: 'The recap' });
   });
 
-  it('preserves stale recaps while forcing regeneration', async () => {
-    const { service } = setup();
+  it.each(['completed', 'queued', 'generating', 'retrying', 'failed'] as const)('invalidates the old result and forces generation from %s', async (status) => {
+    const { service, queue } = setup();
     const item = database!.upsertItem({ kind: 'movie', jellyfinId: 'abcdef123456', path: '/media/a.mkv', title: 'A', tmdbId: '1' });
     database!.enqueue(item.id, 'en');
     database!.markSuccess(item.id, 'en', 'Old recap');
+    database!.db.prepare('UPDATE recaps SET status = ?, error = ?, attempts = 3, next_attempt_at = ? WHERE item_id = ? AND language = ?')
+      .run(status, 'Old OpenRouter error', '2999-01-01T00:00:00.000Z', item.id, 'en');
+
     const result = await service.getRecap({ jellyfin_id: 'abcdef123456', force_regenerate: true });
-    expect(result).toMatchObject({ status: 'regenerating', recap: 'Old recap', stale: true, message: 'Recap generation is in progress' });
-    expect(result).not.toHaveProperty('retryAfterSeconds');
+    const expectedStatus = status === 'generating' ? 'generating' : 'queued';
+    expect(result).toEqual({
+      status: expectedStatus, jellyfinId: 'abcdef123456', language: 'en', title: 'A',
+      message: 'Recap generation is in progress'
+    });
+    expect(database!.getRecap(item.id, 'en')).toMatchObject({
+      status: expectedStatus, recap: null, error: null, generatedAt: null, attempts: 0
+    });
+    expect(database!.nextDueJob()?.itemId).toBe(status === 'generating' ? undefined : item.id);
+    expect(queue.wake).toHaveBeenCalledOnce();
+    expect(await service.getRecap({ jellyfin_id: 'abcdef123456' })).toEqual(result);
   });
 
   it('treats lazy generation as a hard kill switch', async () => {

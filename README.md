@@ -10,7 +10,7 @@ Media stays local. Recaparr extracts embedded or sidecar subtitle text with `ffp
 - Sonarr and Radarr import webhooks
 - Per-item, per-language recap cache
 - Persistent asynchronous generation and retries
-- Forced regeneration without discarding the last successful recap
+- Forced regeneration that invalidates the cached recap and previous error
 - SQLite storage suitable for small personal libraries
 - Read-only access to the media library
 
@@ -48,7 +48,7 @@ Connect an MCP client to `http://HOST:8182/mcp` and send `Authorization: Bearer 
 }
 ```
 
-`force_regenerate` and `language` are optional. Cache misses and refreshes are asynchronous: the result reports `queued`, `generating`, or `retrying` and indicates that generation is in progress. During forced regeneration, the previous recap is returned with `stale: true` until its replacement succeeds.
+`force_regenerate` and `language` are optional. Cache misses and refreshes are asynchronous. Forced regeneration clears the cached recap and previous error, resets retries, and queues an immediate attempt that bypasses shared-file recap caches. It returns `queued` (or `generating` if generation is already running) with a message that generation is in progress. Requests during generation do not start duplicate work. Ordinary requests for a delayed retry return `retrying` with the latest failure message.
 
 ## Webhooks
 

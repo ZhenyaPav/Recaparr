@@ -37,6 +37,7 @@ export interface RecapRecord {
 
 export interface GenerationJob extends RecapRecord {
   item: MediaItem;
+  forceRegenerate: boolean;
 }
 
 export interface GetRecapInput {

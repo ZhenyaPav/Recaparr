@@ -25,6 +25,8 @@ export interface SubtitleCandidate {
 
 const TEXT_CODECS = new Set(['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'mov_text', 'text', 'microdvd']);
 const EXTENSIONS = new Set(['.srt', '.vtt', '.ass', '.ssa']);
+// ponytail: labels only catch explicitly marked partial tracks; unmarked tracks need dialogue coverage analysis.
+const SIGNS_ONLY = /(?:^|[._\s-])(?:signs?[._\s-]*(?:and|&|\+)[._\s-]*songs?|(?:signs?|songs?)[._\s-]*only)(?=$|[._\s(-])/i;
 const LANGUAGE_ALIASES: Record<string, string> = {
   en: 'en', eng: 'en', english: 'en', ro: 'ro', ron: 'ro', rum: 'ro', romanian: 'ro',
   ru: 'ru', rus: 'ru', russian: 'ru', de: 'de', deu: 'de', ger: 'de', german: 'de',
@@ -99,7 +101,7 @@ export class SubtitleExtractor {
     const embedded = await this.embeddedCandidates(mediaPath, preferred);
     const external = await this.externalCandidates(mediaPath, preferred);
     return [...embedded, ...external]
-      .filter((candidate) => !candidate.commentary)
+      .filter((candidate) => !candidate.commentary && !SIGNS_ONLY.test(candidate.label))
       .sort((a, b) => rankSubtitle(a) - rankSubtitle(b) || a.label.localeCompare(b.label));
   }
 

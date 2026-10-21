@@ -48,4 +48,34 @@ describe('subtitle extraction', () => {
     expect(result.candidate.language).toBe('ro');
     expect(result.candidate.source).toBe('external');
   });
+
+  it.each(['Signs and Songs(Half-Baked)', 'Signs & Songs', 'Signs+Songs', 'Signs Only', 'Songs-only'])(
+    'skips a default %s track in favor of full dialogue', async (title) => {
+      const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'recaparr-subtitles-'));
+      tempDirs.push(directory);
+      const media = path.join(directory, 'Example.S02E02.mkv');
+      const extractedStreams: string[] = [];
+      const runner: ProcessRunner = async (_command, args) => {
+        if (args.includes('-show_streams')) return { stdout: JSON.stringify({ streams: [
+          { index: 3, codec_type: 'subtitle', codec_name: 'ass', tags: { language: 'eng', title }, disposition: { default: 1 } },
+          { index: 4, codec_type: 'subtitle', codec_name: 'ass', tags: { language: 'eng', title: 'Full Subs(Half-Baked)' }, disposition: {} }
+        ] }), stderr: '' };
+        extractedStreams.push(args[args.indexOf('-map') + 1]!);
+        return { stdout: 'Full episode dialogue. '.repeat(20), stderr: '' };
+      };
+      const result = await new SubtitleExtractor('en', 'ffprobe', 'ffmpeg', runner).extract(media);
+      expect(result.candidate.streamIndex).toBe(4);
+      expect(extractedStreams).toEqual(['0:4']);
+    }
+  );
+
+  it('rejects signs-only sidecars even when they exceed the minimum length', async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'recaparr-subtitles-'));
+    tempDirs.push(directory);
+    const media = path.join(directory, 'Example.S02E02.mkv');
+    await fs.writeFile(path.join(directory, 'Example.S02E02.en.signs-and-songs.srt'), 'Episode title and next episode preview. '.repeat(20));
+    const runner: ProcessRunner = async () => ({ stdout: JSON.stringify({ streams: [] }), stderr: '' });
+    await expect(new SubtitleExtractor('en', 'ffprobe', 'ffmpeg', runner).extract(media))
+      .rejects.toThrow('No usable text subtitles found');
+  });
 });

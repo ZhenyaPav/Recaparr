@@ -17,7 +17,7 @@ export function createApp(config: Config, database: RecapDatabase, mapper: PathM
     try {
       database.ping();
       logger.debug('health check passed');
-      response.json({ status: 'ok', version: '0.1.6' });
+      response.json({ status: 'ok', version: '0.1.7' });
     } catch {
       response.status(503).json({ status: 'unhealthy' });
     }

@@ -79,7 +79,7 @@ Tracks are attempted in this order:
 3. Other embedded subtitles
 4. Other external subtitles
 
-Recaparr supports text-based embedded tracks and matching `.srt`, `.vtt`, `.ass`, and `.ssa` files. Bitmap and commentary tracks are ignored. Forced tracks are used only if no fuller candidate is available. Missing subtitles are retried after 5 minutes, 30 minutes, 2 hours, 8 hours, and 24 hours.
+Recaparr supports text-based embedded tracks and matching `.srt`, `.vtt`, `.ass`, and `.ssa` files. Bitmap, commentary, and tracks explicitly labeled signs and songs, signs-only, or songs-only are ignored, even when marked default. This label check cannot detect unmarked partial tracks. Forced tracks are used only if no non-forced candidate exists. Missing subtitles are retried after 5 minutes, 30 minutes, 2 hours, 8 hours, and 24 hours.
 
 ## Development
 
